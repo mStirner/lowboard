@@ -16,8 +16,7 @@ const argv = minimist(process.argv.slice(2), {
 
 console.log("SPI DEVICE STARTED...");
 
-// /dev/spidev0.0
-const bus = SPI.initialize("/sys/class/spi_master/spi2");
+const bus = SPI.initialize("/dev/spidev0.0");
 
 
 bus.clockSpeed(50000); // 50000 & 100000 & 80000
@@ -25,24 +24,24 @@ bus.clockSpeed(50000); // 50000 & 100000 & 80000
 //bus.bitOrder(SPI.order.LSB_FIRST);
 
 
-const LEDs = 10;
+const LEDs = 60; // 60
 const buff = Buffer.alloc(LEDs * 3, 0);
 
 
 // fx process handler
 const handler = require("./fx-handler.js")(buff);
 var fx = null;
-
+var name = null;
 
 /*
 {
-	"color-warmwhite": [180, 220, 5, 0.1],
-	"color-blue": [0, 80, 120, 0.3],
-	"color-green": [0, 50, 0],
-	"color-yellow": [100, 90, 0],
-	"color-orange": [100, 50, 0],
-	"color-lila": [100, 0, 120],
-	"color-blank": [0,0,0]
+    "color-warmwhite": [180, 220, 5, 0.1],
+    "color-blue": [0, 80, 120, 0.3],
+    "color-green": [0, 50, 0],
+    "color-yellow": [100, 90, 0],
+    "color-orange": [100, 50, 0],
+    "color-lila": [100, 0, 120],
+    "color-blank": [0,0,0]
 }
 */
 
@@ -137,35 +136,48 @@ loop();
 
         // listen for messages/data
         ws.on("message", (data) => {
+            try {
 
-            data = JSON.parse(data);
+                data = JSON.parse(data);
+                console.log("Data received", data);
 
-            if (data.fx) {
+                if (data.fx) {
+                    if (data.fx !== name) {
 
-                if (fx) {
-                    fx.kill();
+                        if (fx) {
+                            fx.kill();
+                        }
+
+                        console.log("Spawn fx = %s", data.fx)
+
+                        // create/spawn fx process
+                        name = data.fx;
+                        fx = handler(data.fx, data.options || {});
+
+                    }
+                }
+                
+                if (data.options) {
+
+                    console.log("Send options to fx prcoess", data.options, name);
+
+                    if (fx) {
+                        fx.send(data.options);
+                    }
+
                 }
 
-                console.log("Spawn fx = %s", data.fx)
+                wss.clients.forEach((client) => {
+                    client.send(JSON.stringify(data));
+                });
 
-                // create/spawn fx process
-                fx = handler(data.fx, data.options || {});
+                //ws.send(JSON.stringify(data));
 
-            } else if (data.options) {
+            } catch (err) {
 
-                if (fx) {
-                    fx.send(data.options);
-                }
-
-            } else {
-
-                ws.send(JSON.stringify({
-                    error: "INVALID_OPERATION"
-                }));
+                console.error("Something happend", err);
 
             }
-
-
         });
 
 

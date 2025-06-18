@@ -7,8 +7,20 @@ const args = minimist(process.argv.slice(2), {
 
 
 const options = Object.assign({
-    color: [0, 0, 0]
-}, JSON.parse(args.options))
+    color: [0, 0, 0],
+    brightness: 1,
+    interval: 20
+}, JSON.parse(args.options));
+
+
+process.on("message", (data) => {
+
+    // override options
+    Object.keys(data).forEach((k) => {
+        options[k] = data[k]
+    });
+
+});
 
 
 if (!args.leds) {
@@ -22,22 +34,23 @@ const buff = Buffer.alloc(args.leds * 3, 0);
 
 console.log("FX = straight", buff.length);
 
-for (let i = 0; buff.length > i; i++) {
+const interval = setInterval(() => {
 
-    // RGB settings
-    buff[i * 3 + 0] = options.color[0] || 0;
-    buff[i * 3 + 2] = options.color[1] || 0;
-    buff[i * 3 + 1] = options.color[2] || 0;
+    for (let i = 0; buff.length > i; i++) {
 
-}
+        // RGB settings
+        buff[i * 3 + 0] = options.color[0] || 0;
+        buff[i * 3 + 2] = options.color[1] || 0;
+        buff[i * 3 + 1] = options.color[2] || 0;
 
+    }
 
-//@TODO setInterval nötig ?!
-setInterval(() => {
     process.stderr.write(buff);
-});
+
+}, options.interval);
 
 function cleanup() {
+    clearInterval(interval);
     process.exit(0);
 }
 
